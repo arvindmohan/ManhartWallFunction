@@ -135,9 +135,11 @@ void ManhartWallFunctionFvPatchScalarField::evaluate
 
     const scalarField magFaceGradU(mag(U.snGrad()));  // Calc. Surface Normal Gradient of the boundary field
 
-    const  fvPatchScalarField bpr = pr.boundaryField()[patchi]; 
+    volVectorField gradp  = fvc::grad(pr);
+    vectorField Gbpr = gradp.boundaryField()[patchi];	
+   // const  fvPatchScalarField& bpr = pr.boundaryField()[patchi]; 
     
-    fvPatchVectorField Gbpr = Foam::fvc::grad(bpr)[patchi];
+   //  volVectorField Gbpr = fvc::grad(bpr);
     const scalarField GradP = Gbpr.component(0); 
 
     forAll(nuSgsw, facei) // facei for how many faces ? = boundary field?
