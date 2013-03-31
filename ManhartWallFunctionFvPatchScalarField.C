@@ -136,7 +136,7 @@ void ManhartWallFunctionFvPatchScalarField::evaluate
     const scalarField magFaceGradU(mag(U.snGrad()));  // Calc. Surface Normal Gradient of the boundary field
 
     volVectorField gradp  = fvc::grad(pr);
-    vectorField Gbpr = gradp.boundaryField()[patchi];	
+    const fvPatchVectorField Gbpr = gradp.boundaryField()[patchi];	
    // const  fvPatchScalarField& bpr = pr.boundaryField()[patchi]; 
     
    //  volVectorField Gbpr = fvc::grad(bpr);
@@ -147,12 +147,18 @@ void ManhartWallFunctionFvPatchScalarField::evaluate
         scalar magUpara = magUp[facei];  // Wall Parallel "U" velocity at the cell adjacent to the wall
         
         scalar tau = (nuSgsw[facei] + nuw[facei])*magFaceGradU[facei];  // Wall shear stress (tau) definition.        
+       // scalar utau = sqrt((nuSgsw[facei] + nuw[facei])*magFaceGradU[facei]);
 
-        scalar utau = sqrt(mag(tau)); // Friction Velocity (Utau) definition. 
+        scalar utau = sqrt(tau); // Friction Velocity (Utau) definition. 
 
-        scalar uP =  pow(mag((nuSgsw[facei] + nuw[facei])*(GradP[facei])),0.3333333333333333);  // Defining streamwise pressure based velocity (nuw or nusgs?)
+        scalar uP =  pow(mag(( nuSgsw[facei] +   nuw[facei])*(1/*GradP[facei]*/)),0.3333333333333333);  // Defining streamwise pressure based velocity (nuw or nusgs?)
 
-        scalar utauP = sqrt(sqr(utau) + sqr(uP));
+        std::cout <<  "GradP[facei] is \t" << GradP[facei] << endl; //DEBUG
+     // std::cout << "nuSgsw is \t" << nuSgsw[facei] << "\t and nuw is \t" << nuw[facei] << endl; // DEBUG         
+
+        scalar utauP = sqrt(sqr(utau) + sqr(uP));  
+
+     //   std::cout /* << "utau is" << utau*/ << "\t and uP is \t" << uP << endl;  // DEBUG 
 
         scalar alpha = sqr(utau)/sqr(utauP);
 
@@ -170,13 +176,13 @@ void ManhartWallFunctionFvPatchScalarField::evaluate
             do
             {  //Newton-Raphson Solution
                
-               scalar f = sign(GradP[facei])*(pow((1-alpha),1.5)/2.0)*sqr(ystar) + sign(tau)*alpha*ystar - Ustar;
+               scalar f = sign(1/*GradP[facei]*/)*(pow((1-alpha),1.5)/2.0)*sqr(ystar) + sign(tau)*alpha*ystar - Ustar;
 
                scalar term = sqr(utauP) - sqr(utau);
 
-               scalar df = sign(GradP[facei])*((3*sqr(utauP)*pow(term,0.5) - pow(term,1.5))/(2*sqr(utauP)))*sqr(term2)     
+               scalar df = sign(1/*GradP[facei]*/)*((3*sqr(utauP)*pow(term,0.5) - pow(term,1.5))/(2*sqr(utauP)))*sqr(term2)     
                     + (magUpara/sqr(utauP)) - sign(tau)*alpha*term2;
-
+              
 
                scalar utauPNEW = utauP - f/df;
  
@@ -188,11 +194,11 @@ void ManhartWallFunctionFvPatchScalarField::evaluate
 
             // Calculating final parameters
              
-             utau = sqrt(sqr(utauP) - sqr(uP));
+             utau = sqrt(sqr(utauP) - 0 /*sqr(uP)*/);
 
-             tau = sqr(utau); 
+             tau = sqr(max(utau,0)); 
 
-             scalar nuCorr = (tau/magFaceGradU[facei])*(1 + (nuSgsw[facei]/nuw[facei])) - nuw[facei] - nuSgsw[facei]; 
+             scalar nuCorr = (tau/10/*/magFaceGradU[facei]*/)*(1 + (nuSgsw[facei]/nuw[facei])) - nuw[facei] - nuSgsw[facei]; 
 
              nuSgsw[facei] = nuSgsw[facei] + nuCorr; // Updating new value of nuSgs
 

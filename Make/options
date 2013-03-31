@@ -7,7 +7,8 @@ EXE_INC = \
     -I$(LIB_SRC)/transportModels/incompressible/singlePhaseTransportModel/lnInclude \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
     -I$(LIB_SRC)/meshTools/lnInclude  \
-    -I$(LIB_SRC)/turbulenceModels/incompressible/LES/derivedFvPatchFields/wallFunctions/ManhartWallFunction/lnInclude 
+    -I$(LIB_SRC)/turbulenceModels/incompressible/LES/derivedFvPatchFields/wallFunctions/ManhartWallFunction/lnInclude \
+    -DFULLDEBUG -g -O0
 
 EXE_LIBS = \
     -lincompressibleTurbulenceModel \
