@@ -140,12 +140,15 @@ void ManhartWallFunctionFvPatchScalarField::evaluate
    // const  fvPatchScalarField& bpr = pr.boundaryField()[patchi]; 
     
    //  volVectorField Gbpr = fvc::grad(bpr);
-    const scalarField GradP = Gbpr.component(0); 
+    scalarField GradP = Gbpr.component(0); 
 
     forAll(nuSgsw, facei) // facei for how many faces ? = boundary field?
     {
         scalar magUpara = magUp[facei];  // Wall Parallel "U" velocity at the cell adjacent to the wall
-      
+
+        GradP[facei] = max(GradP[facei],0.1);
+       
+        std::cout << "\n";
         std::cout << "magUpara is \t" << magUpara ;       
        
         scalar tau = (nuSgsw[facei] + nuw[facei])*magFaceGradU[facei];  // Wall shear stress (tau) definition.        
@@ -154,7 +157,7 @@ void ManhartWallFunctionFvPatchScalarField::evaluate
         
         scalar utau = sqrt(tau); // Friction Velocity (Utau) definition. 
 
-        scalar uP = max(pow(mag(( nuSgsw[facei] +   nuw[facei])*(GradP[facei])),(1.0/3.0)),0.1);  // Defining streamwise pressure based velocity (nuw or nusgs?)
+        scalar uP = pow(mag(( nuSgsw[facei] +   nuw[facei])*(GradP[facei])),(1.0/3.0));  // Defining streamwise pressure based velocity (nuw or nusgs?)
 
         std::cout <<  "GradP[facei] is \t" << GradP[facei] << "\n"; //DEBUG
         std::cout << "nuSgsw is \t" << nuSgsw[facei] << "\t and nuw is \t" << nuw[facei]; // DEBUG         
@@ -182,27 +185,37 @@ void ManhartWallFunctionFvPatchScalarField::evaluate
             do
             {  //Newton-Raphson Solution
                
-               scalar f = sign(GradP[facei])*(pow((1-alpha),1.5)/2.0)*sqr(ystar) + sign(tau)*alpha*ystar - Ustar;
+               scalar f = sign(GradP[facei])*(pow((1-alpha),1.5)/2.0)*pow(ystar,2) + sign(tau)*alpha*ystar - (magUpara/utauP);
 
-               scalar term = sqr(utauP) - sqr(utau);
+               scalar term = pow(utauP,2) - pow(utau,2);
+               std::cout << " The new uP is" << uP << "\n";
+               std::cout << "The prev. iteration  utauP is" << utauP << " The prev. iter utau is" << utau << "\n"; //DEBUG
+               std::cout << "term is \t" << term << "\n"; //DEBUG
+
+       scalar df = sign(GradP[facei])*(((3*pow(utauP,2)*sqrt(term)) - pow(term,1.5))/(2*pow(utauP,2)))*pow(term2,2) + (magUpara/pow(utauP,2)) - sign(tau)*alpha*term2;
                
-               std::cout << "term is \t" << term; //DEBUG
-
-               scalar df = sign(GradP[facei])*(((3*sqr(utauP)*sqrt(term)) - pow(term,1.5))/(2*sqr(utauP)))*sqr(term2) + (magUpara/sqr(utauP)) - sign(tau)*alpha*term2;
-              
+               std::cout << " NR Values " << "\n";     //DEBUG
+               std::cout << " the 'f' is " << f << "\n";
+               std::cout << " the 'df' is " << df << "\t The term2 is" << term2 <<  "\n";
+      
                scalar utauPNEW = utauP - f/df;
  
-               scalar err = mag((utauP - utauPNEW)/utauP);
+               scalar err = mag((utauP - utauPNEW)/utauP); 
 
                utauP = utauPNEW;
+               std::cout << "utauPNEW is" << utauP << "\n";
+
+               utau = sqrt(pow(utauP,2) - pow(uP,2));     //sqrt(sqr(utauP) - sqr(uP));
+               std::cout << " the utauNEW is " << utau << "\n";
+               tau = sqr(max(utau,0)); 
              
             } while (utauP > VSMALL && err > 0.01 && ++iter < 20);        // Setting tolerance criteria for Utau and max limit of NR iterations
-
             // Calculating final parameters
-             
-             utau = sqrt(sqr(utauP) - sqr(uP));
-
-             tau = sqr(max(utau,0)); 
+             std::cout << " FINAL utauP is " << utauP << "\n";
+             std::cout << " FINAL utau is " << utau << "\n";
+           //  utau = sqrt(sqr(utauP) - sqr(uP));
+            
+           //  tau = sqr(max(utau,0)); 
 
              std::cout << " New tau is \t" << tau; //DEBUG
              std::cout << " The new magFaceGradU is \t" << magFaceGradU[facei];
@@ -210,7 +223,7 @@ void ManhartWallFunctionFvPatchScalarField::evaluate
 
              scalar nuCorr = (tau/magFaceGradU[facei])*(1 + (nuSgsw[facei]/nuw[facei])) - nuw[facei] - nuSgsw[facei];
              
-             std::cout << "nuCorr is \t" << nuCorr << endl;  //DEBUG
+             std::cout << "nuCorr is \t" << nuCorr;  //DEBUG
 
              nuSgsw[facei] = nuSgsw[facei] + nuCorr; // Updating new value of nuSgs
 
