@@ -146,7 +146,7 @@ void ManhartWallFunctionFvPatchScalarField::evaluate
     {
         scalar magUpara = magUp[facei];  // Wall Parallel "U" velocity at the cell adjacent to the wall
 
-        GradP[facei] = max(GradP[facei],0.1);
+        scalar Pgrad = GradP[facei];
        
         std::cout << "\n";
         std::cout << "magUpara is \t" << magUpara ;       
@@ -155,29 +155,28 @@ void ManhartWallFunctionFvPatchScalarField::evaluate
        // scalar utau = sqrt((nuSgsw[facei] + nuw[facei])*magFaceGradU[facei]);
         std::cout << "magFaceGradU[facei] is \t" << magFaceGradU[facei]; 
         
-        scalar utau = sqrt(tau); // Friction Velocity (Utau) definition. 
+        scalar utau = sqrt(mag(tau)); // Friction Velocity (Utau) definition. 
 
-        scalar uP = pow(mag(( nuSgsw[facei] +   nuw[facei])*(GradP[facei])),(1.0/3.0));  // Defining streamwise pressure based velocity (nuw or nusgs?)
+        scalar uP = pow(mag(( nuSgsw[facei] +   nuw[facei])*Pgrad),(1.0/3.0));  // Defining streamwise pressure based velocity (nuw or nusgs?)
 
-        std::cout <<  "GradP[facei] is \t" << GradP[facei] << "\n"; //DEBUG
+        std::cout <<  "GradP[facei] is \t" << Pgrad << "\n"; //DEBUG
         std::cout << "nuSgsw is \t" << nuSgsw[facei] << "\t and nuw is \t" << nuw[facei]; // DEBUG         
 
         scalar utauP = sqrt(sqr(utau) + sqr(uP)); 
  
         std::cout << "utauP is \t" << utauP << "\n"; //DEBUG
-        std::cout  << "utau is" << utau << "\t and uP is \t" << uP ;  // DEBUG 
+        std::cout  << "utau is" << utau << "\t and uP is \t" << uP << "\n" ;  // DEBUG 
 
         scalar alpha = sqr(utau)/sqr(utauP);
 
-        std::cout <<  "Alpha is \t" << alpha;
+        std::cout <<  "Alpha is \t" << alpha << "\n";
 
-        scalar Ustar = magUpara/utauP;
+     //   scalar Ustar = magUpara/utauP;
 
-        scalar  ystar =  utauP/(ry[facei]*nuw[facei]);   
-
-        scalar term2 =  1.0/(ry[facei]*nuw[facei]);
-
-        if (utauP > VSMALL)   
+  //      scalar  ystar =  utauP/(ry[facei]*nuw[facei]);   
+        std::cout << " Newton Raphson Loop Start " << "\n";
+        
+        if (utau > VSMALL)   
         {
             int iter = 0;
             scalar err = GREAT;
@@ -185,37 +184,42 @@ void ManhartWallFunctionFvPatchScalarField::evaluate
             do
             {  //Newton-Raphson Solution
                
-               scalar f = sign(GradP[facei])*(pow((1-alpha),1.5)/2.0)*pow(ystar,2) + sign(tau)*alpha*ystar - (magUpara/utauP);
 
-               scalar term = pow(utauP,2) - pow(utau,2);
-               std::cout << " The new uP is" << uP << "\n";
-               std::cout << "The prev. iteration  utauP is" << utauP << " The prev. iter utau is" << utau << "\n"; //DEBUG
-               std::cout << "term is \t" << term << "\n"; //DEBUG
-
-       scalar df = sign(GradP[facei])*(((3*pow(utauP,2)*sqrt(term)) - pow(term,1.5))/(2*pow(utauP,2)))*pow(term2,2) + (magUpara/pow(utauP,2)) - sign(tau)*alpha*term2;
+               scalar YoverNu =  1.0/(ry[facei]*nuw[facei]);
+               scalar utauPsqr = sqr(utau) + sqr(uP);
+               // F
+               scalar f =  sign(tau)*(sqr(utau)/sqrt(utauPsqr))*YoverNu 
+                           + sign(Pgrad)*0.5*(pow(uP,3)/sqrt(utauPsqr))*sqr(YoverNu) 
+                           - magUpara/sqrt(utauPsqr);
                
+               // DEBUG
+               std::cout << " The new uP is" << uP << "\n";
+               std::cout << "The prev. iteration  utauP is" << sqrt(utauPsqr) << "\t The prev. iter utau is" << utau << "\n"; //DEBUG
+               std::cout << "YoverNu is \t" << YoverNu << "\n"; //DEBUG
+               // F DERIVATIVE
+               scalar df =  sign(tau)*(2*utau/sqrt(utauPsqr) - pow(utau,3)/pow(utauPsqr,1.5))*YoverNu 
+                            + magUpara*(utau/pow(utauPsqr,1.5))
+                            - sign(Pgrad)*0.5*(pow(uP,3)*(1.0/pow(utauPsqr,1.5))*utau)*sqr(YoverNu);
+
+               //DEBUG
                std::cout << " NR Values " << "\n";     //DEBUG
                std::cout << " the 'f' is " << f << "\n";
-               std::cout << " the 'df' is " << df << "\t The term2 is" << term2 <<  "\n";
+               std::cout << " the 'df' is " << df <<  "\n";
       
-               scalar utauPNEW = utauP - f/df;
+              
+               // correction   
+               scalar utauNew = utau - f/df;
  
-               scalar err = mag((utauP - utauPNEW)/utauP); 
+               err = mag((utau - utauNew)/utau);
 
-               utauP = utauPNEW;
-               std::cout << "utauPNEW is" << utauP << "\n";
+               utau = utauNew;
+               std::cout << "utauNew is" << utau << "\n";
+               std::cout << "Error is" << err << "\n";
 
-               utau = sqrt(pow(utauP,2) - pow(uP,2));     //sqrt(sqr(utauP) - sqr(uP));
-               std::cout << " the utauNEW is " << utau << "\n";
-               tau = sqr(max(utau,0)); 
+               tau = sqr(utau); // sqr(max(utau,0)); 
              
-            } while (utauP > VSMALL && err > 0.01 && ++iter < 20);        // Setting tolerance criteria for Utau and max limit of NR iterations
-            // Calculating final parameters
-             std::cout << " FINAL utauP is " << utauP << "\n";
-             std::cout << " FINAL utau is " << utau << "\n";
-           //  utau = sqrt(sqr(utauP) - sqr(uP));
-            
-           //  tau = sqr(max(utau,0)); 
+            } while (utau > VSMALL && err > 0.01 && ++iter < 10);        // Setting tolerance criteria for Utau and max limit of NR iterations
+          
 
              std::cout << " New tau is \t" << tau; //DEBUG
              std::cout << " The new magFaceGradU is \t" << magFaceGradU[facei];
